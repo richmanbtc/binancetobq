@@ -1,4 +1,8 @@
 
+cpu
+
+- Slow cpu disconnects ws.
+- Probably because websocket ping pong processing is delayed.
 
 data check
 
