@@ -6,6 +6,10 @@ def parse_symbols(s):
     return [f'{x}USDT' for x in s.split(',') if len(s) > 0]
 
 
+def parse_intervals(s):
+    return [x for x in s.split(',') if len(s) > 0]
+
+
 def create_logger(log_level, name="binancebq"):
     level = getattr(logging, log_level.upper())
     formatter = logging.Formatter(
