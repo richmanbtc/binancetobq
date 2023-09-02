@@ -1,0 +1,15 @@
+version: "3"
+services:
+  binancetobq:
+    build: .
+    environment:
+      GC_PROJECT_ID: ${GC_PROJECT_ID}
+      BINANCETOBQ_DATASET: ${BINANCETOBQ_DATASET}
+      BINANCETOBQ_PERP_SYMBOLS: ${BINANCETOBQ_PERP_SYMBOLS}
+      BINANCETOBQ_SPOT_SYMBOLS: ${BINANCETOBQ_SPOT_SYMBOLS}
+      BINANCETOBQ_LOG_LEVEL: ${BINANCETOBQ_LOG_LEVEL}
+      GOOGLE_APPLICATION_CREDENTIALS: /google_credentials.json
+    volumes:
+      - ./src:/app/src:ro
+      - ./tmp:/app/tmp
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-./LICENSE}:/google_credentials.json:ro
