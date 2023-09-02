@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir \
     pandas-gbq \
     retry==0.9.2 \
     python-binance==1.0.19 \
-    pandas==1.5.1
+    pandas==1.5.1 \
+    yappi==1.4.0
 
 ADD . /app
 WORKDIR /app

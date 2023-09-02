@@ -119,16 +119,16 @@ class Bot:
 
 def _ws_kline_to_rest(x):
     return [
-        x['t'], # Kline start time
-        x['o'], # ohlcv
+        x['t'],  # Kline start time
+        x['o'],  # ohlcv
         x['h'],
         x['l'],
         x['c'],
         x['v'],
-        x['T'], # Kline close time
-        x['q'], # Quote asset volume
-        x['n'], # Number of trades
-        x['V'], # Taker buy base asset volume
-        x['Q'], # Taker buy quote asset volume
-        x['B'], # Unused field, ignore.
+        x['T'],  # Kline close time
+        x['q'],  # Quote asset volume
+        x['n'],  # Number of trades
+        x['V'],  # Taker buy base asset volume
+        x['Q'],  # Taker buy quote asset volume
+        x['B'],  # Unused field, ignore.
     ]

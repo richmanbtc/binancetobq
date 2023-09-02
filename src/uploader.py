@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import pandas as pd
 from collections import defaultdict
@@ -7,16 +6,16 @@ from google.cloud import bigquery
 
 class Uploader:
     def __init__(self, market_type, intervals, project_id,
-                 dataset_name, logger, bq_uploader):
+                 dataset_name, logger, bq_uploader, symbols):
         self.market_type = market_type
         self.df_1m = defaultdict(pd.DataFrame)
         self.client = bigquery.Client(project=project_id)
         self.project_id = project_id
         self.dataset_name = dataset_name
         self.intervals = intervals
-        self.last_timestamps = defaultdict(dict)
         self.logger = logger
         self.bq_uploader = bq_uploader
+        self._initialize_last_timestamps(symbols)
 
     # old data is ignored
     # rows format: binance kline rest api response
@@ -36,13 +35,18 @@ class Uploader:
         df_1m = df_1m.loc[~df_1m['timestamp'].duplicated(keep='last')]  # overwrite
         df_1m = df_1m.sort_values('timestamp', kind='stable')
 
+        if self.df_1m[symbol].shape[0] > 0 and df_1m['timestamp'].max() <= self.df_1m[symbol]['timestamp'].max():
+            self.df_1m[symbol] = df_1m
+            self.logger.debug(f'skipped because no new timestamp')
+            return
+
         for interval in self.intervals:
             df = df_1m.copy()
             interval_sec = _interval_to_sec(interval)
             df = _process_df(df, interval_sec).reset_index()
             df['symbol'] = symbol
 
-            last_timestamp = self._get_last_timestamp(interval, symbol)
+            last_timestamp = self.last_timestamps[interval][symbol]
             df = df.loc[df['timestamp'] > last_timestamp]
             df = df.iloc[:-1]  # remove partial
             df = df.dropna()  # just in case
@@ -63,31 +67,31 @@ class Uploader:
 
     def get_last_timestamp(self, symbol):
         return min([
-            self._get_last_timestamp(interval, symbol)
+            self.last_timestamps[interval][symbol]
             for interval in self.intervals
         ])
 
-    def _get_last_timestamp(self, interval, symbol):
-        if symbol not in self.last_timestamps[interval]:
-            now = int(time.time())
+    def _initialize_last_timestamps(self, symbols):
+        last_timestamps = {}
+        for interval in self.intervals:
             table_id = self._get_table_id(interval)
-            last_timestamp = 0
-            for lookback in [7 * 24 * 60 * 60, None]:
-                query = f'SELECT MAX(timestamp) as last_timestamp FROM `{table_id}`'
-                cond = [f"`symbol` = '{symbol}'"]
-                if lookback is not None:
-                    cond.append(f'timestamp > {now - lookback}')
-                cond = ' AND '.join(cond)
-                query += f' WHERE {cond}'
-                query_job = self.client.query(query)
-                for row in query_job:
-                    if row['last_timestamp'] is not None:
-                        last_timestamp = row['last_timestamp']
-                if last_timestamp > 0:
-                    break
 
-            self.last_timestamps[interval][symbol] = int(last_timestamp)
-        return self.last_timestamps[interval][symbol]
+            query = f'SELECT `symbol`, MAX(`timestamp`) as last_timestamp FROM `{table_id}`'
+            symbol_in = ','.join([f"'{s}'" for s in symbols])
+            cond = [f"`symbol` IN ({symbol_in})"]
+            cond = ' AND '.join(cond)
+            query += f' WHERE {cond}'
+            query += ' GROUP BY `symbol`'
+            query_job = self.client.query(query)
+            lt = {}
+            for row in query_job:
+                if row['last_timestamp'] is None:
+                    lt[row['symbol']] = 0
+                else:
+                    lt[row['symbol']] = int(row['last_timestamp'])
+            last_timestamps[interval] = lt
+
+        self.last_timestamps = last_timestamps
 
     def _get_table_id(self, interval):
         table_id = self.dataset_name + '.' + {

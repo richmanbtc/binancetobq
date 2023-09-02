@@ -8,6 +8,7 @@ class PanicManager:
         self.monitors = {}
         self.logger = logger
         self.lock = threading.Lock()
+        self.terminated = False
         self.thread = threading.Thread(target=self.run)
         self.thread.start()
 
@@ -29,8 +30,12 @@ class PanicManager:
     def panic(self):
         os._exit(1)
 
+    def join(self):
+        self.terminated = True
+        self.thread.join()
+
     def run(self):
-        while True:
+        while not self.terminated:
             # self.logger.debug('panic_manager loop')
             now = time.time()
             with self.lock:

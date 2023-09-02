@@ -13,6 +13,13 @@ dataset_name = os.getenv('BINANCETOBQ_DATASET')
 log_level = os.getenv('BINANCETOBQ_LOG_LEVEL')
 logger = create_logger(log_level)
 
+yappi_enabled = bool(os.getenv('YAPPI_ENABLED', ''))
+if yappi_enabled:
+    import yappi
+    yappi.set_clock_type('cpu')
+    yappi.start()
+    logger.info('yappi start')
+
 logger.info('start')
 logger.info(f'spot_symbols {spot_symbols}')
 logger.info(f'perp_symbols {perp_symbols}')
@@ -32,6 +39,7 @@ spot_uploader = Uploader(
     dataset_name=dataset_name,
     logger=create_logger(log_level, 'spot_uploader'),
     bq_uploader=bq_uploader,
+    symbols=spot_symbols,
 )
 perp_uploader = Uploader(
     market_type=MARKET_TYPE_PERP,
@@ -40,6 +48,7 @@ perp_uploader = Uploader(
     dataset_name=dataset_name,
     logger=create_logger(log_level, 'perp_uploader'),
     bq_uploader=bq_uploader,
+    symbols=perp_symbols,
 )
 bot = Bot(
     spot_symbols=spot_symbols,
@@ -48,8 +57,18 @@ bot = Bot(
     spot_uploader=spot_uploader,
     perp_uploader=perp_uploader,
 )
-while not bot.finished:
-    time.sleep(0.1)
+
+try:
+    while not bot.finished:
+        time.sleep(0.1)
+except KeyboardInterrupt:
+    logger.warning('keyboard interrupt')
+
 bot.join()
 bq_uploader.join()
+panic_manager.join()
 logger.info('exit')
+
+if yappi_enabled:
+    yappi.get_func_stats().print_all()
+    yappi.get_thread_stats().print_all()
