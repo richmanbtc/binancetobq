@@ -28,7 +28,7 @@ logger.info(f'intervals {intervals}')
 logger.info(f'symbols {symbols}')
 
 panic_manager = PanicManager(logger=create_logger(log_level, 'panic_manager'))
-panic_manager.register('bq_uploader', 15 * 60, 15 * 60)
+panic_manager.register('bq_uploader', 65 * 60, 65 * 60)
 
 bq_uploader = BqUploader(
     project_id=project_id,
