@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from collections import defaultdict
 from google.cloud import bigquery
-
+from google.api_core.exceptions import NotFound
 
 class Uploader:
     def __init__(self, market_type, intervals, project_id,
@@ -82,13 +82,16 @@ class Uploader:
             cond = ' AND '.join(cond)
             query += f' WHERE {cond}'
             query += ' GROUP BY `symbol`'
-            query_job = self.client.query(query)
             lt = {}
-            for row in query_job:
-                if row['last_timestamp'] is None:
-                    lt[row['symbol']] = 0
-                else:
-                    lt[row['symbol']] = int(row['last_timestamp'])
+            try:
+                query_job = self.client.query(query)
+                for row in query_job:
+                    if row['last_timestamp'] is None:
+                        lt[row['symbol']] = 0
+                    else:
+                        lt[row['symbol']] = int(row['last_timestamp'])
+            except NotFound as ex:
+                self.logger.warning(f'table not found. skip last_timestamp initialization {ex}')
             last_timestamps[interval] = lt
 
         self.last_timestamps = last_timestamps
