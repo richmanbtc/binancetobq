@@ -82,13 +82,11 @@ class Uploader:
             cond = ' AND '.join(cond)
             query += f' WHERE {cond}'
             query += ' GROUP BY `symbol`'
-            lt = {}
+            lt = { s: 0 for s in symbols }
             try:
                 query_job = self.client.query(query)
                 for row in query_job:
-                    if row['last_timestamp'] is None:
-                        lt[row['symbol']] = 0
-                    else:
+                    if row['last_timestamp'] is not None:
                         lt[row['symbol']] = int(row['last_timestamp'])
             except NotFound as ex:
                 self.logger.warning(f'table not found. skip last_timestamp initialization {ex}')
