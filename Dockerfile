@@ -20,10 +20,12 @@ RUN pip install --no-cache-dir \
     'google-cloud-bigquery[bqstorage,pandas]' \
     pandas-gbq \
     python-binance==1.0.19 \
-    pandas==1.5.1 \
+    numpy==1.26.4 pandas==1.5.1 \
     yappi==1.4.0
 
 ADD . /app
+RUN python -c "import numpy; import pandas; import pandas_gbq; from google.cloud import bigquery; from binance import Client, ThreadedWebsocketManager"
+
 WORKDIR /app
 CMD python -m src.main
 ENV BINANCETOBQ_LOG_LEVEL=debug
