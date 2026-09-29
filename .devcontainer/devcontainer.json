@@ -1,9 +1,12 @@
 {
-  "name": "binancetobq",
+  "name": "Go collector",
   "build": {
-    "dockerfile": "../Dockerfile",
-    "context": "../"
+    "dockerfile": "Dockerfile"
   },
+  "mounts": [
+    "source=${localWorkspaceFolder}/config.toml,target=/root/.codex/config.toml,type=bind,readonly"
+  ],
+  "remoteUser": "root",
   "workspaceFolder": "/workspace",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind"
 }

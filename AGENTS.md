@@ -1,4 +1,4 @@
-- Do not perform any Git operations.
-- Never persist or transmit secrets, environment-specific identifiers, names, paths, endpoints, credentials, or configuration values.
+- Git may be used only for local read-only inspection. Never access the network or modify repository state.
+- Never persist or transmit secrets, credentials, or environment-specific configuration.
 - Keep code concise.
 - Use ASCII characters only in files.
