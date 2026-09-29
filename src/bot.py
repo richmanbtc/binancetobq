@@ -1,6 +1,7 @@
 from itertools import islice
 from binance import Client, ThreadedWebsocketManager
 from binance.streams import ReconnectingWebsocket
+from binance.exceptions import BinanceAPIException
 
 ReconnectingWebsocket.MAX_RECONNECTS = 0  # prevent reconnect
 ReconnectingWebsocket.MAX_QUEUE_SIZE = 100000
@@ -20,12 +21,23 @@ class Bot:
 
         # fetch old data
         for symbol in symbols:
-            self._fetch_historical(symbol)
+            try:
+                self._fetch_historical(symbol)
+            except BinanceAPIException as e:
+                if e.code != -1121:
+                    raise
+                self.symbols.remove(symbol)
+                self.logger.warning("Skipping an invalid symbol during startup.")
+
+        self.twm = None
+        if not self.symbols:
+            self.finished = True
+            return
 
         self.twm = ThreadedWebsocketManager()
         self.twm.start()
 
-        streams = [f'{s.lower()}@kline_1m' for s in symbols]
+        streams = [f'{s.lower()}@kline_1m' for s in self.symbols]
         if market_type == MARKET_TYPE_SPOT:
             self.twm.start_multiplex_socket(
                 callback=self._handle_socket_message,
@@ -41,8 +53,9 @@ class Bot:
 
     def join(self):
         self.logger.info('join')
-        self.twm.stop()
-        self.twm.join()
+        if self.twm is not None:
+            self.twm.stop()
+            self.twm.join()
 
     # called from other thread
     # partial kline comes
