@@ -172,3 +172,5 @@ cython_debug/
 /notebooks/datasets
 lightning_logs
 /notebooks/tb_logs
+
+/tmp

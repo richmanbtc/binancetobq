@@ -1,0 +1,4 @@
+- Do not perform any Git operations.
+- Never persist or transmit secrets, environment-specific identifiers, names, paths, endpoints, credentials, or configuration values.
+- Keep code concise.
+- Use ASCII characters only in files.
