@@ -20,7 +20,7 @@ import (
 )
 
 const restFixture = `[[0,"100","102","99","101","5",59999,"500",7,"2","200","0"]]`
-const streamFixture = `{"data":{"e":"kline","s":"TEST","k":{"t":0,"i":"1m","x":true,"o":"100","h":"102","l":"99","c":"101","v":"5","q":"500","n":7,"V":"2","Q":"200"}}}`
+const streamFixture = `{"data":{"e":"kline","E":60000,"s":"TEST","k":{"t":0,"T":59999,"i":"1m","x":true,"o":"100","h":"102","l":"99","L":12345,"c":"101","v":"5","q":"500","n":7,"V":"2","Q":"200"}}}`
 
 func TestBothTransportsRejectInvalidCandleValues(t *testing.T) {
 	for _, bad := range []string{`"NaN"`, `"+Inf"`, `"-Inf"`, `"1e999"`, `"\x31\x30\x30"`, `null`, `"0"`, `"103"`} {

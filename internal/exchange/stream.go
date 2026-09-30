@@ -14,12 +14,16 @@ import (
 )
 
 func decodeStream(body []byte) (model.Candle, bool, error) {
+	// Explicit uppercase tags prevent case-insensitive matches to e, t and l.
 	type streamMessage struct {
-		Data   *streamMessage `json:"data"`
-		Event  string         `json:"e"`
-		Symbol string         `json:"s"`
-		K      *struct {
+		Data      *streamMessage  `json:"data"`
+		Event     string          `json:"e"`
+		EventTime json.RawMessage `json:"E"`
+		Symbol    string          `json:"s"`
+		K         *struct {
 			Time      *int64          `json:"t"`
+			CloseTime json.RawMessage `json:"T"`
+			LastTrade json.RawMessage `json:"L"`
 			Closed    *bool           `json:"x"`
 			Interval  string          `json:"i"`
 			Open      json.RawMessage `json:"o"`
