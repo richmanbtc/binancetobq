@@ -69,6 +69,9 @@ func (e *Client) page(ctx context.Context, symbol string, start, end int64) ([]m
 			return nil, fmt.Errorf("exchange HTTP status %d", status)
 		}
 		delay = retryAfter(header, delay)
+		if attempt < 7 {
+			slog.Warn("exchange request retry", "symbol", symbol, "status", status, "attempt", attempt+1, "wait_seconds", delay.Seconds())
+		}
 		if err := retry.Wait(ctx, delay); err != nil {
 			return nil, err
 		}
@@ -105,11 +108,12 @@ func (e *Client) History(ctx context.Context, symbol string, start, end int64, c
 	bounded := end >= 0
 	pending := 0
 	for {
+		started := time.Now()
 		rows, err := e.page(ctx, symbol, start, end)
 		if err != nil {
 			return err
 		}
-		slog.Debug("historical page received", "rows", len(rows))
+		slog.Debug("historical page received", "symbol", symbol, "rows", len(rows), "from", time.Unix(start, 0).UTC(), "duration_ms", time.Since(started).Milliseconds())
 		previous := start - 1
 		for _, c := range rows {
 			if c.Time < start || c.Time <= previous {

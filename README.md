@@ -79,9 +79,13 @@ configuration, credentials and process supervision belong to the deployment.
 - There is no graceful shutdown or shutdown budget. SIGINT/SIGTERM use the OS
   default termination behavior. Errors return without draining queues or waiting
   for workers or client cleanup. Uncommitted rows are recovered on restart.
-- Logs contain counts and generic errors, not symbols, endpoints, credentials,
-  or project/dataset identifiers. Catch-up reports per-symbol completion; DEBUG
-  also reports page row counts. A failed writer stops collection.
+- Logs include symbols, recovery ranges and durations, save row and symbol
+  counts, saved timestamp ranges, and retry status, attempts and waits. Errors
+  identify the failing stage. Endpoints, credentials and project/dataset
+  identifiers are omitted. DEBUG also reports historical page details. A failed
+  writer stops collection. Timestamp ranges use UTC; processed_until is an
+  exclusive boundary, while saved ranges describe bucket start times. Retry
+  status 0 means no HTTP status was available.
 
 ## Package boundaries
 
@@ -260,8 +264,12 @@ process, subject to the save watchdog. No shutdown grace is required.
 - Checkpoints use MAX(timestamp), as in Python. They do not detect older
   interior holes. Repairing pre-existing holes is a separate, explicit
   operation.
-- Detailed transport error bodies are intentionally suppressed. Operational
-  diagnosis may require checking the deployment and warehouse consoles.
+- Raw transport error bodies are suppressed. Warehouse load failures log the
+  submission, polling or job stage, HTTP status (0 when unavailable), recognized
+  API reason and diagnostic clauses, including known-column type/mode changes.
+  Free-form messages, unknown field names and error locations are omitted to
+  avoid exposing credentials, configuration or input data. Unrecognized details
+  still require checking the deployment and warehouse consoles.
 
 ## Container image
 

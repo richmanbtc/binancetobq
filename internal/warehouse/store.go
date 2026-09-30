@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 
@@ -173,6 +174,7 @@ func (s *Store) Append(ctx context.Context, interval int64, rows []model.Row) er
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		retryStatus := 0
 		if job == nil {
 			source := bigquery.NewReaderSource(bytes.NewReader(payload.Bytes()))
 			source.SourceFormat = bigquery.JSON
@@ -191,23 +193,30 @@ func (s *Store) Append(ctx context.Context, interval int64, rows []model.Row) er
 					job, err = s.client.JobFromIDLocation(ctx, jobID, metadata.Location)
 				}
 			}
+			retryStatus = apiStatus(err)
 			if permanentAPIError(err) {
+				s.logLoadError("submission", interval, err)
 				return fmt.Errorf("warehouse load submission failed (HTTP %d)", apiStatus(err))
 			}
 		}
 		if job != nil {
 			status, err := job.Wait(ctx)
+			retryStatus = apiStatus(err)
 			switch {
 			case permanentAPIError(err):
+				s.logLoadError("polling", interval, err)
 				return fmt.Errorf("reading warehouse load status failed (HTTP %d)", apiStatus(err))
 			case err == nil && status.Err() != nil:
+				s.logLoadError("job", interval, status.Err())
 				return errors.New("warehouse load job failed")
 			case err == nil:
 				return nil
 			}
 		}
 		// Ambiguous transport failures reuse the same job ID, never blindly append again.
-		if err := retry.Wait(ctx, retry.Delay(attempt)); err != nil {
+		delay := retry.Delay(attempt)
+		slog.Warn("warehouse load retry", "interval_seconds", interval, "rows", len(rows), "status", retryStatus, "attempt", attempt+1, "wait_seconds", delay.Seconds())
+		if err := retry.Wait(ctx, delay); err != nil {
 			return err
 		}
 	}

@@ -43,7 +43,7 @@ func execute(ctx context.Context, w *watchdog.Watchdog) error {
 	store, err := warehouse.New(initCtx, warehouse.Options{Project: c.Project, Dataset: c.Dataset, Symbols: c.Symbols, Tables: c.Tables, Intervals: c.Intervals})
 	done()
 	if err != nil {
-		return err
+		return fmt.Errorf("warehouse initialization: %w", err)
 	}
 	ex := exchange.New(exchange.Options{REST: c.REST, WebSocket: c.WebSocket, Pace: 250 * time.Millisecond})
 	return run(ctx, c, ex, store, w.Ping)
@@ -65,7 +65,7 @@ func run(ctx context.Context, c config.Config, ex collector.Source, store Store,
 	checkpoints, err := store.Checkpoints(startup)
 	cancelStartup()
 	if err != nil {
-		return err
+		return fmt.Errorf("warehouse checkpoints: %w", err)
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)

@@ -51,16 +51,19 @@ func (c *collector) consume(r model.Range) error {
 func (c *collector) backfill(ctx context.Context) error {
 	kept := c.active[:0]
 	for index, symbol := range c.active {
-		err := c.source.History(ctx, symbol, c.engine.Resume(symbol), -1, c.consume)
+		from, started := c.engine.Resume(symbol), time.Now()
+		slog.Info("historical symbol recovery started", "symbol", symbol, "position", index+1, "total", len(c.active), "from", time.Unix(from, 0).UTC())
+		err := c.source.History(ctx, symbol, from, -1, c.consume)
 		if errors.Is(err, model.ErrInvalidSymbol) {
-			slog.Warn("skipping invalid symbol", "position", index+1)
+			slog.Warn("skipping invalid symbol", "symbol", symbol, "position", index+1)
 			continue
 		}
 		if err != nil {
+			slog.Error("historical recovery failed", "symbol", symbol)
 			return err
 		}
 		kept = append(kept, symbol)
-		slog.Info("historical symbol recovered", "position", index+1, "total", len(c.active))
+		slog.Info("historical symbol recovered", "symbol", symbol, "position", index+1, "total", len(c.active), "from", time.Unix(from, 0).UTC(), "processed_until", time.Unix(c.engine.Resume(symbol), 0).UTC(), "duration_ms", time.Since(started).Milliseconds())
 	}
 	c.active = kept
 	if len(c.active) == 0 {
@@ -89,7 +92,13 @@ func (c *collector) session() error {
 	ctx, cancel := context.WithCancelCause(c.ctx)
 	defer cancel(nil)
 	incoming := make(chan model.Event, 4096)
-	go func() { cancel(c.source.Stream(ctx, c.active, incoming)) }()
+	go func() {
+		err := c.source.Stream(ctx, c.active, incoming)
+		if err != nil {
+			slog.Error("realtime stream failed")
+		}
+		cancel(err)
+	}()
 	synced := make(map[string]bool)
 	watch := time.NewTicker(time.Minute)
 	defer watch.Stop()
@@ -104,6 +113,7 @@ func (c *collector) session() error {
 				continue
 			}
 			if err := c.accept(ctx, candle, !synced[candle.Symbol]); err != nil {
+				slog.Error("realtime processing failed", "symbol", candle.Symbol)
 				return cmp.Or(context.Cause(ctx), err)
 			}
 			synced[candle.Symbol] = true
