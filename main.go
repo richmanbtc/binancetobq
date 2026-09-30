@@ -52,12 +52,17 @@ func execute(ctx context.Context, w *watchdog.Watchdog) error {
 func main() {
 	w := watchdog.New(config.SaveTimeout(nil), hardExit)
 	defer w.Close()
+	started := time.Now()
+	lifecycle := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	lifecycle.Info("collector starting")
 	// Leave SIGINT/SIGTERM to the OS: no drain or client cleanup on exit.
 	err := execute(context.Background(), w)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		lifecycle.Error("collector exiting", "exit_code", 1, "uptime_seconds", time.Since(started).Seconds())
 		os.Exit(1)
 	}
+	lifecycle.Info("collector exiting", "exit_code", 0, "uptime_seconds", time.Since(started).Seconds())
 }
 
 func run(ctx context.Context, c config.Config, ex collector.Source, store Store, onSaved func()) error {

@@ -79,6 +79,11 @@ configuration, credentials and process supervision belong to the deployment.
 - There is no graceful shutdown or shutdown budget. SIGINT/SIGTERM use the OS
   default termination behavior. Errors return without draining queues or waiting
   for workers or client cleanup. Uncommitted rows are recovered on restart.
+- Process startup always logs "collector starting" before configuration and
+  warehouse setup, regardless of the configured log level. Normal returns and
+  application errors log "collector exiting" with exit code and uptime.
+  Watchdog exits and OS signal termination do not emit an exit log; the next
+  startup log identifies the new process run.
 - Logs include symbols, recovery ranges and durations, save row and symbol
   counts, saved timestamp ranges, and retry status, attempts and waits. Errors
   identify the failing stage. Endpoints, credentials and project/dataset
