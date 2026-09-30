@@ -23,8 +23,20 @@ type Config struct {
 
 func Read() (Config, error) {
 	c := Config{Project: os.Getenv("GC_PROJECT_ID"), Dataset: os.Getenv("BINANCETOBQ_DATASET"), Tables: make(map[int64]string), FlushEvery: 5 * time.Second}
-	if !regexp.MustCompile(`^[a-z][a-z0-9-]{4,61}[a-z0-9]$`).MatchString(c.Project) || !regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`).MatchString(c.Dataset) {
-		return c, errors.New("set valid GC_PROJECT_ID and BINANCETOBQ_DATASET")
+	// Allow legacy project IDs; BigQuery validates existence and validity.
+	// Restrict characters because warehouse queries interpolate quoted paths.
+	if !regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`).MatchString(c.Project) {
+		return c, errors.New("set GC_PROJECT_ID using letters, digits, underscores, hyphens, dots or colons")
+	}
+	dataset := c.Dataset
+	if i := strings.LastIndexByte(dataset, '.'); i >= 0 {
+		if !regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`).MatchString(dataset[:i]) {
+			return c, errors.New("invalid project in BINANCETOBQ_DATASET")
+		}
+		dataset = dataset[i+1:]
+	}
+	if len(dataset) > 1024 || !regexp.MustCompile(`^[A-Za-z0-9_]+$`).MatchString(dataset) {
+		return c, errors.New("set BINANCETOBQ_DATASET to dataset_id or project_id.dataset_id; dataset ID must use 1-1024 letters, digits or underscores")
 	}
 	switch strings.ToUpper(os.Getenv("BINANCETOBQ_LOG_LEVEL")) {
 	case "DEBUG", "NOTSET":

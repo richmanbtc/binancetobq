@@ -3,6 +3,7 @@ package config
 import (
 	"log/slog"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -84,5 +85,58 @@ func TestSaveTimeout(t *testing.T) {
 		if SaveTimeout(tt.intervals) != tt.want {
 			t.Fatal("incorrect save deadline")
 		}
+	}
+}
+
+func TestBigQueryIdentifiers(t *testing.T) {
+	t.Setenv("BINANCETOBQ_MARKET_TYPE", "spot")
+	t.Setenv("BINANCETOBQ_INTERVALS", "5m")
+	t.Setenv("BINANCETOBQ_SYMBOLS", "AAA")
+	t.Setenv("BINANCETOBQ_LOG_LEVEL", "INFO")
+	for _, tc := range []struct {
+		name, project, dataset, wantError string
+	}{
+		{"standard", "test-project", "test_dataset", ""},
+		{"numeric dataset", "test-project", "2024", ""},
+		{"numeric prefix", "test-project", "2024_market", ""},
+		{"hidden dataset", "test-project", "_hidden", ""},
+		{"maximum dataset", "test-project", strings.Repeat("a", 1024), ""},
+		{"domain project", "example.com:test-project", "test_dataset", ""},
+		{"legacy project", "legacy_project", "test_dataset", ""},
+		{"short project", "old", "test_dataset", ""},
+		{"empty project", "", "test_dataset", "GC_PROJECT_ID"},
+		{"empty dataset", "test-project", "", "BINANCETOBQ_DATASET"},
+		{"long dataset", "test-project", strings.Repeat("a", 1025), "BINANCETOBQ_DATASET"},
+		{"dataset hyphen", "test-project", "test-dataset", "BINANCETOBQ_DATASET"},
+		{"qualified dataset", "test-project", "other-project.dataset", ""},
+		{"qualified domain dataset", "test-project", "example.com:other-project.dataset", ""},
+		{"qualified maximum dataset", "test-project", "other-project." + strings.Repeat("a", 1024), ""},
+		{"qualified long dataset", "test-project", "other-project." + strings.Repeat("a", 1025), "BINANCETOBQ_DATASET"},
+		{"empty qualified project", "test-project", ".dataset", "BINANCETOBQ_DATASET"},
+		{"empty qualified dataset", "test-project", "other-project.", "BINANCETOBQ_DATASET"},
+		{"qualified project quote", "test-project", "other`project.dataset", "BINANCETOBQ_DATASET"},
+		{"project space", "test project", "test_dataset", "GC_PROJECT_ID"},
+		{"project newline", "test-project\n", "test_dataset", "GC_PROJECT_ID"},
+		{"project quote", "test`project", "test_dataset", "GC_PROJECT_ID"},
+		{"project escape", "test\\project", "test_dataset", "GC_PROJECT_ID"},
+		{"dataset quote", "test-project", "test`dataset", "BINANCETOBQ_DATASET"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GC_PROJECT_ID", tc.project)
+			t.Setenv("BINANCETOBQ_DATASET", tc.dataset)
+			c, err := Read()
+			if tc.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantError) {
+					t.Fatalf("expected error naming %s, got %v", tc.wantError, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Project != tc.project || c.Dataset != tc.dataset {
+				t.Fatal("identifiers were changed")
+			}
+		})
 	}
 }

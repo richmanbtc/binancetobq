@@ -171,12 +171,16 @@ Supply these environment variables externally; do not commit actual values.
 
 | Variable | Meaning |
 | --- | --- |
-| `GC_PROJECT_ID` | BigQuery project |
-| `BINANCETOBQ_DATASET` | Existing BigQuery dataset |
+| `GC_PROJECT_ID` | BigQuery project ID; legacy domain-scoped IDs are accepted |
+| `BINANCETOBQ_DATASET` | Existing `dataset_id` or `project_id.dataset_id`; dataset ID uses 1-1024 letters, digits or underscores |
 | `BINANCETOBQ_SYMBOLS` | Comma-separated base assets without USDT; USDT is appended; at most 200 unique symbols per process |
 | `BINANCETOBQ_MARKET_TYPE` | `spot` or `perp` (USD-M futures) |
 | `BINANCETOBQ_INTERVALS` | `5m`, `1h`, or both comma-separated |
 | `BINANCETOBQ_LOG_LEVEL` | `DEBUG`/`NOTSET`, `INFO`, `WARNING`/`WARN`, `ERROR`, `CRITICAL`/`FATAL` (case-insensitive); defaults to `INFO` |
+
+An unqualified dataset belongs to `GC_PROJECT_ID`. A qualified dataset selects
+its own destination project; `GC_PROJECT_ID` remains the project used to submit
+and bill BigQuery jobs. The execution identity needs access to both projects.
 
 BigQuery infers job locations from the destination or referenced dataset;
 existing load-job recovery reads the dataset location automatically. REST and

@@ -38,6 +38,14 @@ func New(ctx context.Context, o Options) (*Store, error) {
 	return &Store{client: client, config: o}, nil
 }
 
+// A qualified dataset overrides the destination project, not the job project.
+func (s *Store) dataset() *bigquery.Dataset {
+	if i := strings.LastIndexByte(s.config.Dataset, '.'); i >= 0 {
+		return s.client.DatasetInProject(s.config.Dataset[:i], s.config.Dataset[i+1:])
+	}
+	return s.client.Dataset(s.config.Dataset)
+}
+
 func schema(interval int64) bigquery.Schema {
 	t := reflect.TypeFor[model.Row]()
 	var result bigquery.Schema
@@ -75,7 +83,8 @@ func permanentAPIError(err error) bool {
 // The destination supplies this field; it must stay out of the load input schema.
 func (s *Store) prepareTable(ctx context.Context, interval int64) error {
 	c := s.config
-	table := s.client.Dataset(c.Dataset).Table(c.Tables[interval])
+	dataset := s.dataset()
+	table := dataset.Table(c.Tables[interval])
 	metadata, err := table.Metadata(ctx)
 	if apiStatus(err) == 404 {
 		fields := append(schema(interval), &bigquery.FieldSchema{
@@ -105,7 +114,7 @@ func (s *Store) prepareTable(ctx context.Context, interval int64) error {
 		}
 	}
 	// Existing rows remain NULL. Separate statements also recover a partial migration.
-	name := fmt.Sprintf("`%s.%s.%s`", c.Project, c.Dataset, c.Tables[interval])
+	name := fmt.Sprintf("`%s.%s.%s`", dataset.ProjectID, dataset.DatasetID, c.Tables[interval])
 	q := s.client.Query(fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMP; ALTER TABLE %s ALTER COLUMN ingested_at SET DEFAULT CURRENT_TIMESTAMP()", name, name))
 	job, err := q.Run(ctx)
 	if err != nil {
@@ -120,6 +129,7 @@ func (s *Store) prepareTable(ctx context.Context, interval int64) error {
 
 func (s *Store) Checkpoints(ctx context.Context) (model.Checkpoints, error) {
 	c := s.config
+	dataset := s.dataset()
 	result := make(model.Checkpoints)
 	for _, interval := range c.Intervals {
 		if err := s.prepareTable(ctx, interval); err != nil {
@@ -127,7 +137,7 @@ func (s *Store) Checkpoints(ctx context.Context) (model.Checkpoints, error) {
 		}
 		result[interval] = make(map[string]int64)
 		// Identifiers are validated in the application configuration; values use query parameters.
-		q := s.client.Query(fmt.Sprintf("SELECT symbol, MAX(timestamp) AS last_time FROM `%s.%s.%s` WHERE symbol IN UNNEST(@symbols) GROUP BY symbol", c.Project, c.Dataset, c.Tables[interval]))
+		q := s.client.Query(fmt.Sprintf("SELECT symbol, MAX(timestamp) AS last_time FROM `%s.%s.%s` WHERE symbol IN UNNEST(@symbols) GROUP BY symbol", dataset.ProjectID, dataset.DatasetID, c.Tables[interval]))
 		q.Parameters = []bigquery.QueryParameter{{Name: "symbols", Value: c.Symbols}}
 		it, err := q.Read(ctx)
 		if err != nil {
@@ -167,7 +177,7 @@ func (s *Store) Append(ctx context.Context, interval int64, rows []model.Row) er
 			source := bigquery.NewReaderSource(bytes.NewReader(payload.Bytes()))
 			source.SourceFormat = bigquery.JSON
 			source.Schema = schema(interval)
-			loader := s.client.Dataset(s.config.Dataset).Table(s.config.Tables[interval]).LoaderFrom(source)
+			loader := s.dataset().Table(s.config.Tables[interval]).LoaderFrom(source)
 			loader.WriteDisposition = bigquery.WriteAppend
 			loader.CreateDisposition = bigquery.CreateNever
 			loader.JobID = jobID
@@ -175,7 +185,7 @@ func (s *Store) Append(ctx context.Context, interval int64, rows []model.Row) er
 			job, err = loader.Run(ctx)
 			if apiStatus(err) == 409 {
 				// Regional job lookup needs a location even when submission inferred it.
-				metadata, lookupErr := s.client.Dataset(s.config.Dataset).Metadata(ctx)
+				metadata, lookupErr := s.dataset().Metadata(ctx)
 				err = lookupErr
 				if err == nil {
 					job, err = s.client.JobFromIDLocation(ctx, jobID, metadata.Location)
