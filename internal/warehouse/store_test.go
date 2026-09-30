@@ -87,6 +87,9 @@ func TestLoadJobConflictResolvesExistingJob(t *testing.T) {
 								t.Error("load could recreate a table without defaults")
 							}
 							for _, field := range job.Configuration.Load.Schema.Fields {
+								if field.Mode != "REQUIRED" {
+									t.Errorf("load field %s must be REQUIRED", field.Name)
+								}
 								if field.Name == "ingested_at" {
 									t.Error("input schema overrides destination default")
 								}
@@ -298,6 +301,9 @@ func TestSchemaCompatibility(t *testing.T) {
 	for _, interval := range []int64{300, 3600} {
 		hasFive := false
 		for _, field := range schema(interval) {
+			if !field.Required {
+				t.Fatalf("field %s must be REQUIRED", field.Name)
+			}
 			if field.Name == "twap_5m" {
 				hasFive = true
 			}

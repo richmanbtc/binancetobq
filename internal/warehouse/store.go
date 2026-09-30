@@ -63,7 +63,7 @@ func schema(interval int64) bigquery.Schema {
 		if field.Name == "Time" {
 			kind = bigquery.IntegerFieldType
 		}
-		result = append(result, &bigquery.FieldSchema{Name: name, Type: kind})
+		result = append(result, &bigquery.FieldSchema{Name: name, Type: kind, Required: true})
 	}
 	return result
 }
