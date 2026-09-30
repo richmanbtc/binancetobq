@@ -1,4 +1,4 @@
-- Git may be used only for local read-only inspection. Never access the network or modify repository state.
+- Git may be used only for local, read-only inspection. Do not use Git for network access or for any operation that changes repository state.
 - Never persist or transmit secrets, credentials, or environment-specific configuration.
 - Keep code concise.
 - Use ASCII characters only in files.
